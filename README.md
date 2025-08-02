@@ -69,9 +69,7 @@ The application's data is organized into eight interconnected tables:
 | ParkingSpot    | An individual spot within a ParkingArea, with a unique identifier and status.      |
 | Booking        | The central transactional table, linking a User, Car, and ParkingSpot for a session.|
 
-## 5. ER Diagram
 
-![ER Diagram](er_diagram.png)
 
 ## 5. Key Implementation Details
 - **Time Handling:** All datetime operations are timezone-aware, using `datetime.now(timezone.utc)` to ensure consistency and prevent timezone-related bugs during calculations.  
