@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Pending Requests{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Pending Requests</h3>
+  <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">Back</a>
+</div>
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr>
+        <th>#</th><th>User</th><th>Car</th><th>Area</th><th>Spot</th><th>Requested</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in pendings %}
+      <tr>
+        <td>{{ b.id }}</td>
+        <td>{{ b.user.username }}</td>
+        <td>{{ b.car.license_plate }}</td>
+        <td>{{ b.spot.parking_area.name }}</td>
+        <td>{{ b.spot.spot_identifier }}</td>
+        <td>{{ b.start_time.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td class="text-nowrap">
+          <form method="post" action="{{ url_for('admin_request_approve', booking_id=b.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button class="btn btn-success btn-sm">Approve</button>
+          </form>
+          <form method="post" action="{{ url_for('admin_request_reject', booking_id=b.id) }}" class="d-inline ms-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button class="btn btn-outline-danger btn-sm">Reject</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center text-muted">No pending requests.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<hr class="my-4">
+
+<h3 class="mb-3">Active Offline Bookings</h3>
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr>
+        <th>#</th><th>User</th><th>Car</th><th>Area</th><th>Spot</th><th>Started</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in offline_active %}
+      <tr>
+        <td>{{ b.id }}</td>
+        <td>{{ b.user.username if b.user else 'N/A' }}</td>
+        <td>{{ b.car.license_plate if b.car else 'N/A' }}</td>
+        <td>{{ b.spot.parking_area.name if b.spot and b.spot.parking_area else 'N/A' }}</td>
+        <td>{{ b.spot.spot_identifier if b.spot else 'N/A' }}</td>
+        <td>{{ b.start_time.strftime('%Y-%m-%d %H:%M') if b.start_time else 'N/A' }}</td>
+        <td class="text-nowrap">
+          <form method="post" action="{{ url_for('admin_offline_release', booking_id=b.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button class="btn btn-outline-danger btn-sm">Release</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center text-muted">No active offline bookings.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

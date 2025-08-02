@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}My Parking History{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">My Parking History</h3>
+  <a href="{{ url_for('user_dashboard') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Dashboard
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <table class="table table-striped table-hover">
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th>Spot</th>
+          <th>Car Plate</th>
+          <th>Start Time</th>
+          <th>End Time</th>
+          <th>Status</th>
+          <th>Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for booking in bookings %}
+          <tr>
+            <td>{{ booking.spot.parking_area.name }}</td>
+            <td>{{ booking.spot.spot_identifier }}</td>
+            <td>{{ booking.car.license_plate }}</td>
+            <td>{{ booking.start_time.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ booking.end_time.strftime('%Y-%m-%d %H:%M') if booking.end_time else 'N/A' }}</td>
+            <td>
+              <span class="badge bg-{{ 'success' if booking.status == 'completed' else 'warning' }}">
+                {{ booking.status|capitalize }}
+              </span>
+            </td>
+            <td>
+              {% if booking.total_cost is not none %}
+                ₹{{ '%.2f'|format(booking.total_cost) }}
+              {% else %}
+                N/A
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">You have no parking history yet.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

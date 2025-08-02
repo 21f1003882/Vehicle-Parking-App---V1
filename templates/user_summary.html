@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}My Summary{% endblock %}
+
+{% block content %}
+<h3 class="mb-3">My Summary</h3>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Total Sessions</div>
+        <div class="display-6">{{ total_sessions }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Total Spent</div>
+        <div class="display-6">₹ {{ '%.2f'|format(total_spent) }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Recent Spend</h5>
+    <canvas id="spendChart"></canvas>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Last 5 Completed Sessions</h5>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered">
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th>Spot</th>
+            <th>Car</th>
+            <th>From</th>
+            <th>Until</th>
+            <th>Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in last_5 %}
+          <tr>
+            <td>{{ b.spot.parking_area.name if b.spot and b.spot.parking_area else 'N/A' }}</td>
+            <td>{{ b.spot.spot_identifier if b.spot else 'N/A' }}</td>
+            <td>{{ b.car.license_plate if b.car else 'N/A' }}</td>
+            <td>{{ b.start_time.strftime('%Y-%m-%d %H:%M') if b.start_time else 'N/A' }}</td>
+            <td>{{ b.end_time.strftime('%Y-%m-%d %H:%M') if b.end_time else '---' }}</td>
+            <td>{{ '₹ %.2f'|format(b.total_cost or 0.0) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted">No history yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async function(){
+  try {
+    const res = await fetch('{{ url_for("api_user_spend") }}');
+    const data = await res.json();
+    if (data.labels && data.labels.length > 0) {
+      new Chart(document.getElementById('spendChart'), {
+        type: 'bar',
+        data: {
+          labels: data.labels,
+          datasets: [{ label: 'Cost (₹)', data: data.totals }]
+        }
+      });
+    } else {
+      document.getElementById('spendChart').parentElement.innerHTML =
+        '<p class="text-muted mb-0">No spending history yet.</p>';
+    }
+  } catch(e) { console.error('Could not load spend chart:', e); }
+});
+</script>
+{% endblock %}

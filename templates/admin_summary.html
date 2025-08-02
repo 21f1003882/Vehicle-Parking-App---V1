@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Admin Summary{% endblock %}
+
+{% block content %}
+<h3 class="mb-3">Admin Summary</h3>
+
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Areas</div>
+      <div class="display-6">{{ total_areas }}</div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Spots (Total / Avail)</div>
+      <div class="display-6">{{ total_spots }} <span class="text-danger small">/ {{ available_spots }}</span></div>
+      <div class="small text-muted">Occupied: {{ occupied_spots }} · Reserved: {{ reserved_spots }}</div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Bookings (Active / Pending)</div>
+      <div class="display-6">{{ active_bookings }} <span class="text-danger small">/ {{ pending_bookings }}</span></div>
+      <div class="small text-muted">Completed: {{ completed_bookings }}</div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Revenue (All-time)</div>
+      <div class="display-6">₹ {{ '%.2f'|format(revenue_total) }}</div>
+    </div></div>
+  </div>
+</div>
+
+<!-- Bigger charts -->
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">Occupancy by Area</h5>
+        <div style="height: 420px;">
+          <canvas id="occChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">Revenue by Area</h5>
+        <div style="height: 420px;">
+          <canvas id="revChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}
+
+{% block scripts_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async function(){
+  // Occupancy
+  try {
+    const occRes = await fetch('{{ url_for("api_admin_occupancy") }}');
+    const occData = await occRes.json();
+    new Chart(document.getElementById('occChart'), {
+      type: 'bar',
+      data: {
+        labels: occData.labels,
+        datasets: [
+          { label: 'Occupied',  data: occData.occupied,  backgroundColor: '#dc3545' },
+          { label: 'Available', data: occData.available, backgroundColor: '#198754' }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+      }
+    });
+  } catch(e){ console.error(e); }
+
+  // Revenue
+  try {
+    const revRes = await fetch('{{ url_for("api_admin_revenue") }}');
+    const revData = await revRes.json();
+    new Chart(document.getElementById('revChart'), {
+      type: 'bar',
+      data: {
+        labels: revData.labels,
+        datasets: [{ label: 'Revenue (₹)', data: revData.totals, backgroundColor: '#0d6efd' }]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { title: { display: true, text: 'Area' } },
+          y: { title: { display: true, text: 'Revenue (₹)' }, beginAtZero: true }
+        }
+      }
+    });
+  } catch(e){ console.error(e); }
+});
+</script>
+{% endblock %}

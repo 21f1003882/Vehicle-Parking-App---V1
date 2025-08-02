@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}User Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">User Dashboard</h3>
+  <div>
+    <a href="{{ url_for('user_history') }}" class="btn btn-outline-secondary me-2">
+      <i class="bi bi-clock-history"></i> My History
+    </a>
+    <a href="{{ url_for('user_cars') }}" class="btn btn-primary">
+      <i class="bi bi-car-front-fill"></i> My Cars
+    </a>
+  </div>
+</div>
+
+{# --- Multiple Active / Pending banners --- #}
+{% for b in active_bookings %}
+<div class="alert alert-info">
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <strong>Active Parking</strong> — Car <strong>{{ b.car.license_plate }}</strong>,
+      Spot <strong>{{ b.spot.spot_identifier }}</strong> at <em>{{ b.spot.parking_area.name }}</em>.
+    </div>
+    <form method="post" action="{{ url_for('user_release', booking_id=b.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <button class="btn btn-sm btn-danger">
+        <i class="bi bi-box-arrow-right"></i> Release Now
+      </button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+{% for b in pending_bookings %}
+<div class="alert alert-warning">
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <strong>Pending Approval</strong> — Car <strong>{{ b.car.license_plate }}</strong>,
+      Spot <strong>{{ b.spot.spot_identifier }}</strong> at <em>{{ b.spot.parking_area.name }}</em>.
+    </div>
+    <form method="post" action="{{ url_for('user_cancel_pending', booking_id=b.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <button class="btn btn-sm btn-outline-secondary">Cancel</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+<h4 class="mt-4">Book a Spot</h4>
+
+{% if not cars %}
+  <div class="alert alert-warning">
+    You must <a href="{{ url_for('user_cars') }}">add a car</a> before you can book a parking spot.
+  </div>
+{% else %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form id="flowForm" method="post" action="{{ url_for('user_book') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="car_id" id="car_id_hidden">
+
+        {# Step 1: Choose Car #}
+        <div class="mb-4">
+          <h6 class="text-uppercase text-muted mb-2">Step 1</h6>
+          <h5 class="mb-2">Select your car</h5>
+          <select id="carSelect" class="form-select">
+            <option value="" selected disabled>Choose a car…</option>
+            {% for car in cars %}
+              {% set locked = car.id in car_ids_locked %}
+              <option value="{{ car.id }}" data-locked="{{ 1 if locked else 0 }}">
+                {{ car.license_plate }} ({{ car.make }} {{ car.model }}){% if locked %} — already booked{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <div id="carLockedNote" class="form-text text-danger d-none">
+            This car already has an active or pending booking.
+          </div>
+        </div>
+
+        {# Step 2: Choose Area #}
+        <div id="step2" class="mb-4 d-none">
+          <h6 class="text-uppercase text-muted mb-2">Step 2</h6>
+          <h5 class="mb-2">Select a parking location</h5>
+
+          <div class="list-group">
+            {% for area in areas %}
+              {% set available_spots = area.spots.filter_by(status='available').count() %}
+              <label class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="area_id"
+                         value="{{ area.id }}"
+                         id="area_{{ area.id }}"
+                         {% if available_spots == 0 %}disabled{% endif %}
+                         data-area-name="{{ area.name }}"
+                         data-price="{{ '%.2f'|format(area.price_per_hour) }}"
+                         data-available="{{ available_spots }}">
+                  <span class="ms-2">
+                    <strong>{{ area.name }}</strong>
+                    <span class="text-muted small d-block">
+                      ₹{{ '%.2f'|format(area.price_per_hour) }} / hr ·
+                      {{ available_spots }} spot{{ '' if available_spots == 1 else 's' }} available
+                    </span>
+                    {% if area.location_description %}
+                      <span class="small text-muted d-block">{{ area.location_description }}</span>
+                    {% endif %}
+                  </span>
+                </div>
+                {% if available_spots == 0 %}
+                  <span class="badge bg-secondary">Full</span>
+                {% else %}
+                  <span class="badge bg-success">Available</span>
+                {% endif %}
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        {# Step 3: Confirm #}
+        <div id="step3" class="mb-3 d-none">
+          <h6 class="text-uppercase text-muted mb-2">Step 3</h6>
+          <h5 class="mb-2">Confirm your request</h5>
+          <div class="border rounded p-3 mb-3 bg-light">
+            <div id="confirmText" class="small text-muted"></div>
+          </div>
+          <button id="bookBtn" class="btn btn-primary" disabled>
+            <i class="bi bi-check2-circle"></i> Request Booking
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const carSelect   = document.getElementById('carSelect');
+  const carHidden   = document.getElementById('car_id_hidden');
+  const carLockedNote = document.getElementById('carLockedNote');
+  const step2       = document.getElementById('step2');
+  const step3       = document.getElementById('step3');
+  const bookBtn     = document.getElementById('bookBtn');
+  const confirmText = document.getElementById('confirmText');
+  const flowForm    = document.getElementById('flowForm');
+
+  function resetStep2And3(){
+    document.querySelectorAll('input[name="area_id"]').forEach(r => r.checked = false);
+    step2.classList.add('d-none');
+    step3.classList.add('d-none');
+    bookBtn.disabled = true;
+    confirmText.textContent = '';
+  }
+
+  // Step 1 → Step 2
+  carSelect?.addEventListener('change', () => {
+    const sel = carSelect.options[carSelect.selectedIndex];
+    const locked = sel?.dataset.locked === '1';
+    carHidden.value = carSelect.value || '';
+
+    if (locked) {
+      carLockedNote.classList.remove('d-none');
+      resetStep2And3();
+      return;
+    } else {
+      carLockedNote.classList.add('d-none');
+    }
+
+    if (carHidden.value) {
+      step2.classList.remove('d-none');
+      step3.classList.add('d-none');
+      bookBtn.disabled = true;
+      confirmText.textContent = '';
+    } else {
+      resetStep2And3();
+    }
+  });
+
+  // Step 2 → Step 3
+  document.querySelectorAll('input[name="area_id"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const selected = document.querySelector('input[name="area_id"]:checked');
+      if (!selected) {
+        step3.classList.add('d-none');
+        bookBtn.disabled = true;
+        return;
+      }
+      const areaName   = selected.dataset.areaName;
+      const price      = selected.dataset.price;
+      const available  = parseInt(selected.dataset.available || '0', 10);
+
+      confirmText.innerHTML = `
+        You are booking for car <strong>${
+          carSelect.options[carSelect.selectedIndex].text
+        }</strong> at <strong>${areaName}</strong>.<br>
+        Rate: ₹${price}/hr. First hour billed at minimum of 1 hour.`;
+
+      step3.classList.remove('d-none');
+      bookBtn.disabled = (available <= 0 || !carHidden.value);
+    });
+  });
+
+  flowForm?.addEventListener('submit', (e) => {
+    if (!carHidden.value || !document.querySelector('input[name="area_id"]:checked')) {
+      e.preventDefault();
+    }
+  });
+});
+</script>
+{% endblock %}

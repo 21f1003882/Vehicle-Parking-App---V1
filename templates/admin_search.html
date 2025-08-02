@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Search Spot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Search for a Parking Spot</h3>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin_search') }}" novalidate>
+                    {{ form.hidden_tag() }} {# CSRF Token #}
+                    <div class="mb-3">
+                        {{ form.area_id.label(class="form-label") }}
+                        {# Add an ID to the select element for easy targeting with JavaScript #}
+                        {{ form.area_id(class="form-select", id="area-select") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.spot_identifier.label(class="form-label") }}
+                        {{ form.spot_identifier(class="form-control", placeholder="e.g., S-15") }}
+                    </div>
+                    {{ form.submit(class="btn btn-primary w-100") }}
+                </form>
+            </div>
+        </div>
+
+        {% if area_selected %}
+        <div class="accordion" id="spotStatusAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingSpotStatus">
+                    <button id="spot-status-button" class="accordion-button" type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapseSpotStatus"
+                            aria-expanded="true"
+                            aria-controls="collapseSpotStatus">
+                        Spot Status for {{ area_selected.name }}
+                    </button>
+                </h2>
+                <div id="collapseSpotStatus"
+                     class="accordion-collapse collapse show"
+                     aria-labelledby="headingSpotStatus"
+                     data-bs-parent="#spotStatusAccordion">
+                    <div class="accordion-body p-3">
+                        <div class="border rounded p-2">
+                            <div class="d-flex align-items-center flex-wrap gap-1 mb-2"> {# FIX 1: Added flex-wrap and gap #}
+                                <span class="me-1">🔴</span>
+                                <strong id="occupied-count" class="me-1">{{ occupied_identifiers|length }} Booked:</strong>
+                                <div id="occupied-list" class="d-flex flex-wrap gap-1">
+                                    {% for id in occupied_identifiers %}
+                                    <span class="badge bg-danger">{{ id }}</span>
+                                    {% endfor %}
+                                    {% if not occupied_identifiers %}
+                                    <span class="text-muted small">None</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <hr class="my-2">
+                            <div class="d-flex align-items-center flex-wrap gap-1"> {# FIX 1: Added flex-wrap and gap #}
+                                <span class="me-1">🟢</span>
+                                <strong id="available-count" class="me-1">{{ available_identifiers|length }} Available:</strong>
+                                <div id="available-list" class="d-flex flex-wrap gap-1">
+                                    {% for id in available_identifiers %}
+                                    <span class="badge bg-success">{{ id }}</span>
+                                    {% endfor %}
+                                    {% if not available_identifiers %}
+                                    <span class="text-muted small">None</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-7">
+        <h4>Search Result</h4>
+        {% if spot_result %}
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Spot {{ spot_result.spot_identifier }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">in {{ spot_result.parking_area.name }}</h6>
+                <hr>
+                <p>
+                    <strong>Status:</strong>
+                    {% if spot_result.status == 'available' %}
+                    <span class="badge bg-success">Available</span>
+                    {% elif spot_result.status == 'occupied' %}
+                    <span class="badge bg-danger">Occupied</span>
+                    {% else %}
+                    <span class="badge bg-secondary">{{ spot_result.status|capitalize }}</span>
+                    {% endif %}
+                </p>
+
+                {% if spot_result.status == 'occupied' and spot_result.active_booking %}
+                <p class="mb-1"><strong>Booked by:</strong> {{ spot_result.active_booking.user.username }}</p>
+                <p class="mb-1"><strong>Car Plate:</strong> {{ spot_result.active_booking.car.license_plate }}</p>
+                <p class="mb-1"><strong>Parked Since:</strong> <span data-utc-time="{{ spot_result.active_booking.start_time.isoformat() }}"></span></p>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="card card-body bg-light text-center">
+            <p class="text-muted mb-0">Submit the form to see search results here.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // --- FIX 2: JavaScript for dynamic updates ---
+    const areaSelect = document.getElementById('area-select');
+
+    if (areaSelect) {
+        areaSelect.addEventListener('change', function () {
+            const areaId = this.value;
+            if (!areaId) return;
+
+            // Fetch new spot status from our API endpoint
+            fetch(`/api/admin/areas/${areaId}/spot-status`)
+                .then(response => response.json())
+                .then(data => {
+                    // Update the UI with the new data
+                    updateSpotStatusUI(data);
+                    if (data.area_code && spotIdentifierInput) {
+                        spotIdentifierInput.value = data.area_code + '-'; // Set the value
+                        spotIdentifierInput.focus(); // Focus on the input for immediate typing
+                    }
+                })
+                .catch(error => console.error('Error fetching spot status:', error));
+        });
+    }
+
+    function updateSpotStatusUI(data) {
+        // Update accordion button text
+        document.getElementById('spot-status-button').textContent = `Spot Status for ${data.area_name}`;
+
+        // Update counts
+        document.getElementById('occupied-count').textContent = `${data.occupied_identifiers.length} Unavailable:`;
+        document.getElementById('available-count').textContent = `${data.available_identifiers.length} Available:`;
+
+        // Update lists
+        const occupiedList = document.getElementById('occupied-list');
+        const availableList = document.getElementById('available-list');
+
+        // Clear previous lists
+        occupiedList.innerHTML = '';
+        availableList.innerHTML = '';
+
+        // Populate occupied list
+        if (data.occupied_identifiers.length > 0) {
+            data.occupied_identifiers.forEach(id => {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-danger';
+                badge.textContent = id;
+                occupiedList.appendChild(badge);
+            });
+        } else {
+            occupiedList.innerHTML = '<span class="text-muted small">None</span>';
+        }
+
+        // Populate available list
+        if (data.available_identifiers.length > 0) {
+            data.available_identifiers.forEach(id => {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-success';
+                badge.textContent = id;
+                availableList.appendChild(badge);
+            });
+        } else {
+            availableList.innerHTML = '<span class="text-muted small">None</span>';
+        }
+    }
+
+    // --- Bonus: Convert UTC times to local browser time ---
+    document.querySelectorAll('[data-utc-time]').forEach(el => {
+        const utcDate = new Date(el.dataset.utcTime);
+        el.textContent = utcDate.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Manage Users{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Manage Users</h3>
+  <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Dashboard
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Roles</th>
+            <th>Registered On</th>
+            <th class="text-center">Actions</th> {# NEW HEADER #}
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+          <tr>
+            <td>{{ user.id }}</td>
+            <td>{{ user.username }}</td>
+            <td>{{ user.email }}</td>
+            <td>
+              {% for role in user.roles %}
+                <span class="badge bg-secondary">{{ role.name|capitalize }}</span>
+              {% endfor %}
+            </td>
+            {# Format date for better readability in local timezone #}
+            <td><span data-utc-time="{{ user.created_at.isoformat() }}"></span></td>
+            <td class="text-center">
+              {# NEW BUTTON TO TRIGGER THE MODAL #}
+              <button type="button" class="btn btn-sm btn-info view-stats-btn" 
+                      data-bs-toggle="modal" 
+                      data-bs-target="#userStatsModal"
+                      data-user-id="{{ user.id }}"
+                      data-username="{{ user.username }}">
+                <i class="bi bi-bar-chart-line-fill"></i> View Stats
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted">No users found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal fade" id="userStatsModal" tabindex="-1" aria-labelledby="userStatsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"> {# Extra large and scrollable for lots of data #}
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="userStatsModalLabel">User Statistics</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        
+        <div id="modal-spinner" class="text-center">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p>Fetching user data...</p>
+        </div>
+
+        <div id="modal-content-area" class="d-none">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <p class="mb-1"><strong>Username:</strong> <span id="stats-username"></span></p>
+              <p class="mb-1"><strong>Email:</strong> <span id="stats-email"></span></p>
+            </div>
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Member Since:</strong> <span id="stats-member-since"></span></p>
+                <p class="mb-1"><strong>Total Payments:</strong> <span id="stats-total-spent" class="badge bg-success fs-6"></span></p>
+            </div>
+          </div>
+          
+          <h6 class="mt-4">Booking History</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered" id="stats-booking-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Area</th>
+                  <th>Spot</th>
+                  <th>Car Plate</th>
+                  <th>Parked From</th>
+                  <th>Parked Until</th>
+                  <th>Cost</th>
+                </tr>
+              </thead>
+              <tbody id="stats-booking-tbody">
+                </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+
+{% block scripts_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  
+  // --- NEW JAVASCRIPT FOR THE MODAL ---
+  const userStatsModal = document.getElementById('userStatsModal');
+  const modalSpinner = document.getElementById('modal-spinner');
+  const modalContentArea = document.getElementById('modal-content-area');
+
+  userStatsModal.addEventListener('show.bs.modal', function (event) {
+    // Get the button that triggered the modal
+    const button = event.relatedTarget;
+    const userId = button.dataset.userId;
+    const username = button.dataset.username;
+
+    // 1. Prepare the modal for loading
+    const modalTitle = userStatsModal.querySelector('.modal-title');
+    modalTitle.textContent = `Loading stats for ${username}...`;
+    
+    modalSpinner.classList.remove('d-none');
+    modalContentArea.classList.add('d-none');
+    
+    // Clear previous data
+    const bookingTbody = document.getElementById('stats-booking-tbody');
+    bookingTbody.innerHTML = '';
+
+    // 2. Fetch data from our new API endpoint
+    fetch(`/api/admin/users/${userId}/stats`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(data => {
+        // 3. Populate the modal with the fetched data
+        modalTitle.textContent = `Statistics for ${data.username}`;
+        document.getElementById('stats-username').textContent = data.username;
+        document.getElementById('stats-email').textContent = data.email;
+        document.getElementById('stats-member-since').textContent = new Date(data.member_since).toLocaleDateString();
+        document.getElementById('stats-total-spent').textContent = `₹ ${data.total_spent.toFixed(2)}`;
+
+        if (data.bookings.length === 0) {
+          bookingTbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">This user has no booking history.</td></tr>';
+        } else {
+          data.bookings.forEach(b => {
+            const row = document.createElement('tr');
+            
+            // Format status with a badge
+            let statusBadge = '';
+            if (b.status === 'completed') statusBadge = `<span class="badge bg-success">Completed</span>`;
+            else if (b.status === 'active') statusBadge = `<span class="badge bg-primary">Active</span>`;
+            else if (b.status === 'pending') statusBadge = `<span class="badge bg-warning text-dark">Pending</span>`;
+            else statusBadge = `<span class="badge bg-secondary">${b.status}</span>`;
+
+            // Format dates and cost
+            const startTime = b.start_time ? new Date(b.start_time).toLocaleString() : 'N/A';
+            const endTime = b.end_time ? new Date(b.end_time).toLocaleString() : '---';
+            const cost = b.cost !== null ? `₹ ${b.cost.toFixed(2)}` : '---';
+
+            row.innerHTML = `
+              <td>${statusBadge}</td>
+              <td>${b.area_name}</td>
+              <td>${b.spot_identifier}</td>
+              <td>${b.car_plate}</td>
+              <td>${startTime}</td>
+              <td>${endTime}</td>
+              <td>${cost}</td>
+            `;
+            bookingTbody.appendChild(row);
+          });
+        }
+        // Show content, hide spinner
+        modalSpinner.classList.add('d-none');
+        modalContentArea.classList.remove('d-none');
+      })
+      .catch(error => {
+        modalContentArea.innerHTML = `<div class="alert alert-danger">Could not load user data. Please try again.</div>`;
+        modalSpinner.classList.add('d-none');
+        modalContentArea.classList.remove('d-none');
+        console.error('Error fetching user stats:', error);
+      });
+  });
+
+  // --- Helper to format all UTC dates on the page ---
+  document.querySelectorAll('[data-utc-time]').forEach(el => {
+      const utcDate = new Date(el.dataset.utcTime);
+      el.textContent = utcDate.toLocaleDateString();
+  });
+});
+</script>
+{% endblock %}

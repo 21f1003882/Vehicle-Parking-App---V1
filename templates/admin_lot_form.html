@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if mode == 'new' %}
+    Create New Parking Area
+  {% else %}
+    Edit Parking Area
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-7">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3 class="mb-0">
+        {% if mode == 'new' %}
+          Create New Parking Area
+        {% else %}
+          Edit: {{ lot.name }}
+        {% endif %}
+      </h3>
+      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+      </a>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        {# We give the form an ID so we can submit it from an external button #}
+        <form method="POST"
+              id="area-form"
+              action="{{ url_for('admin_area_new') if mode == 'new' else url_for('admin_area_edit', area_id=lot.id) }}"
+              novalidate>
+          {{ form.hidden_tag() }} {# CSRF Token #}
+
+          <div class="mb-3">
+            {{ form.prime_location_name.label(class="form-label") }}
+            {{ form.prime_location_name(class="form-control") }}
+            {% for error in form.prime_location_name.errors %}
+              <span class="text-danger small">{{ error }}</span>
+            {% endfor %}
+          </div>
+          
+          <div class="mb-3">
+            {{ form.area_code.label(class="form-label") }}
+            {{ form.area_code(class="form-control", placeholder="e.g., PMC", readonly=(mode == 'edit')) }}
+            {% if mode == 'edit' %}
+              <small class="form-text text-muted">The area code cannot be changed after creation.</small>
+            {% endif %}
+            {% for error in form.area_code.errors %}
+              <span class="text-danger small">{{ error }}</span>
+            {% endfor %}
+          </div>
+
+          <div class="mb-3">
+            {{ form.address.label(class="form-label") }}
+            {{ form.address(class="form-control", rows=3) }}
+            {% for error in form.address.errors %}
+              <span class="text-danger small">{{ error }}</span>
+            {% endfor %}
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              {{ form.price_per_hour.label(class="form-label") }}
+              {{ form.price_per_hour(class="form-control") }}
+              {% for error in form.price_per_hour.errors %}
+                <span class="text-danger small">{{ error }}</span>
+              {% endfor %}
+            </div>
+            <div class="col-md-6 mb-3">
+              {{ form.max_spots.label(class="form-label") }}
+              {{ form.max_spots(class="form-control", readonly=(mode == 'edit')) }}
+              {% if mode == 'edit' %}
+                <small class="form-text text-muted">Changing the number of spots is not supported.</small>
+              {% endif %}
+              {% for error in form.max_spots.errors %}
+                <span class="text-danger small">{{ error }}</span>
+              {% endfor %}
+            </div>
+          </div>
+
+          {# The submit button is removed from here and placed in the container below #}
+        </form>
+
+       <div class="d-flex gap-2 mt-4">
+          
+          {# This button is now outside the <form> tag, but it submits it using the 'form' attribute #}
+          <button type="submit" form="area-form" class="btn btn-primary flex-grow-1">
+            {{ 'Create Area' if mode == 'new' else 'Save Changes' }}
+          </button>
+
+          {# The delete form is placed right next to it #}
+          {% if mode == 'edit' %}
+          <form method="post"
+                action="{{ url_for('admin_area_delete', area_id=lot.id) }}"
+                onsubmit="return confirm('Are you sure you want to delete this parking area? This action cannot be undone.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn btn-danger">
+              Delete
+            </button>
+          </form>
+          {% endif %}
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

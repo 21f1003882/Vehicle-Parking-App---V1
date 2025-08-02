@@ -1,0 +1,13 @@
+name,area_code,location_description,price_per_hour,num_spots
+"Phoenix MarketCity Parking",PMC,"142, Velachery Main Rd, Chennai",50.00,300
+"T. Nagar Skywalk Plaza",TNP,"Usman Road, T. Nagar, Chennai",60.00,150
+"BKC One Corporate Hub",BKC,"Bandra Kurla Complex, Mumbai",100.00,250
+"Colaba Sea-View Lot",CSV,"Near Gateway of India, Colaba, Mumbai",120.00,80
+"Connaught Place Central Circle",CPC,"Inner Circle, Block A, CP, New Delhi",80.00,180
+"Khan Market Premium Park",KMP,"Prithviraj Market, Khan Market, New Delhi",150.00,60
+"Forum Mall Koramangala",FMK,"21, Hosur Rd, Koramangala, Bengaluru",70.00,400
+"100ft Road Valet Park",RVP,"100 Feet Road, Indiranagar, Bengaluru",90.00,75
+"Hitech City Cyber Towers",HCT,"Madhapur, Hitech City, Hyderabad",65.00,500
+"Park Street Gourmet Parking",PSG,"Allen Park, Park Street, Kolkata",75.00,120
+"Elante Mall Parking",EMP,"178, Industrial Area Phase I, Chandigarh",55.00,600
+"Lulu International Mall Lot",LIM,"Edappally, Kochi, Kerala",45.00,750
